@@ -1,48 +1,50 @@
 # PASS-TRACE
 
-## Contact-Aware Telemetry Gap Classification and Alert Triage for Satellite Operations
+## Live Satellite Pass and Reception Monitor
 
-PASS-TRACE is a student research prototype aligned with satellite mission operations and telemetry analysis.
+PASS-TRACE is a small, working dashboard for exploring real public ground-station observation records. It collects data from the SatNOGS Network API, then lets you review observation windows, reported status, signal evidence, and demodulated-frame counts by satellite and station.
 
-**Project idea:** distinguish expected no-contact periods from telemetry unexpectedly missing during a scheduled contact, then group related alerts and rank them for operator review.
+The dashboard is designed as a practical ground-network data review tool. It does **not** diagnose spacecraft health, treat absent API rows as failed passes, or use ISRO/ISTRAC operational data.
 
-## Current prototype
+## What it does
 
-The single-file Python demo has two parts:
+- Fetches public SatNOGS observations for a selected UTC date range, following the API's cursor-based `Link` pagination.
+- Normalizes each record into a searchable pass table with satellite, NORAD ID, ground station, start/end time, status, waterfall signal status, and demodulated-frame count.
+- Summarizes records by API status and station, provides satellite/station filters, and exports filtered results to CSV.
+- Caches API responses for ten minutes, limits requests to the selected date range, and reports network/API errors rather than silently substituting synthetic data.
 
-1. It downloads the public OPS-SAT-AD feature table and evaluates an Isolation Forest baseline using the dataset's `train` split.
-2. It simulates telemetry across two communication passes, joins alerts into events, and compares FIFO, alert-score, and PASS-TRACE priority rankings.
+## Run locally
 
-The second part is synthetic. It demonstrates the workflow, not real satellite operations. The current code **does not yet classify why data is missing**; expected no-contact versus missing packets during an expected contact is the proposed next feature.
-
-## Run
-
-Install Python 3.10+ and dependencies:
+Use Python 3.10 or newer:
 
 ```bash
 python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+Streamlit will print a local URL, usually `http://localhost:8501`. Choose a UTC date range and wait for the live SatNOGS data to load. The app uses no API key.
+
+## Data source and responsible interpretation
+
+The app uses the public [SatNOGS Network observations API](https://network.satnogs.org/api/observations/) and its documented `start` and `end` filters. The API exposes reported observation status, waterfall status, and demodulated data. SatNOGS states that API data is openly accessible and distributed under the [CC BY-SA license](https://creativecommons.org/licenses/by-sa/4.0/); attribution is included in the interface.
+
+Status and signal labels are presented as reported by SatNOGS. A `good` status is not a spacecraft health diagnosis; `bad` is the network's observation review status. An absent record means only that the selected query returned no record. It is not proof that a satellite pass was missed.
+
+The API returns live community data, so results can change as new observations arrive or records are reviewed. The current UI displays at most 100 records per query to keep the app responsive; narrow the date range if it reports truncation.
+
+## Existing prototype demo
+
+`pass_trace.py` is the original research demo. It runs a separate Isolation Forest baseline check against public OPS-SAT-AD features and a synthetic two-contact alert-grouping simulation. Those two parts are not connected to the live SatNOGS dashboard and do not validate real cross-pass spacecraft telemetry behavior.
+
+To run the original demo:
+
+```bash
 python pass_trace.py
 ```
 
-The public dataset check requires an internet connection. If it cannot download the CSV, the script continues with the synthetic simulation. Google Colab can run the same file after uploading it.
-
-## Dataset and limitations
-
-The public OPS-SAT-AD dataset contains expert-labelled telemetry segments and a benchmark train/test split. It supports a **segment-level detector check**, not cross-pass event reconstruction: the curated data is not a continuous contact history. The simulation supplies known contact windows and event labels so the event-linking logic can be explored separately.
-
-The current Isolation Forest result is a baseline, not a new detector or a claim of state-of-the-art performance. Event priority weights, dropout tolerance, and contact schedules are illustrative parameters. They need systematic evaluation across many labelled scenarios before drawing conclusions.
-
-No ISRO or ISTRAC operational telemetry, schedule, or procedure is included or represented.
-
-## Research question
-
-Can a ground-side system reduce avoidable review alerts by distinguishing expected communication gaps from unexpected telemetry loss during an expected contact, while still linking developing events across passes?
-
-Potential evaluation measures include false alerts on expected gaps, detection of injected in-contact data loss, event-linking precision/recall, missed critical events, and review delay under a fixed review capacity.
-
 ## References
 
-- [OPS-SAT anomaly benchmark paper](https://www.nature.com/articles/s41597-025-05035-3)
-- [ISRO: ISTRAC responsibilities](https://www.isro.gov.in/ISTRAC.html)
-- [ISRO: mission support and satellite contact scheduling](https://www.isro.gov.in/MissionSupport.html)
+- [SatNOGS Network API documentation](https://docs.satnogs.org/projects/satnogs-network/en/latest/api.html)
+- [SatNOGS Network API reference](https://librespacefoundation.gitlab.io/-/satnogs/satnogs-network/-/jobs/1380080108/artifacts/satnogs-network-api-client/html2/index.html)
+- [CelesTrak GP data API](https://celestrak.org/NORAD/documentation/gp-data-formats.php) (not currently required by the dashboard)
 
